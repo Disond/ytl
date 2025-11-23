@@ -54,12 +54,22 @@ function App() {
   const saveEdit = async (id) => {
     try {
       setError(null)
+
+      const currenTask = tasks.find((task) => task.task_id === id)
+      const trimmedText = editedTask.trim()
+
+      if (currenTask.description === trimmedText) {
+        setEditingTask(null)
+        setEditedTask("")
+        return
+      }
+
       await axios.put(`http://localhost:5000/tasks/${id}`, {
         description: editedTask
       })
       setEditingTask(null)
       setEditedTask("")
-      setTasks(tasks.map((task) => task.task_id === id ? { ...task, description: editedTask } : task))
+      setTasks(tasks.map((task) => task.task_id === id ? { ...task, description: editedTask, completed: false } : task))
     } catch (err) {
       console.error(err.message)
       setError("Failed to update task. Please try again later")
