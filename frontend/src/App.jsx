@@ -13,14 +13,24 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
+  // Pagination
+  const [page, setPage] = useState(1)
+  const [pageSize] = useState(5)
+  const [sort, setSort] = useState("asc")
+  const [total, setTotal] = useState(0)
+
   // Get Tasks
   const getTasks = async () => {
     try {
       setLoading(true)
       setError(null)
-      const res = await axios.get("http://localhost:5000/tasks")
-      setTasks(res.data)
-      console.log(res.data)
+      const res = await axios.get("http://localhost:5000/tasks", {
+        params: { page, pageSize, sort }
+      })
+
+      setTasks(res.data.data)
+      setTotal(res.data.total)
+      // console.log(res.data)
     } catch (err) {
       console.error(err.message)
       setError("Failed to fetch tasks. Please try again later.")
@@ -31,7 +41,7 @@ function App() {
 
   useEffect(() => {
     getTasks()
-  }, [])
+  }, [page, sort])
 
   // Submit Form 
   const onSubmitForm = async (e) => {
@@ -43,8 +53,9 @@ function App() {
         description,
         completed: false
       })
-      setTasks([...tasks, res.data])
+      // setTasks([...tasks, res.data])
       setDescription("")
+      getTasks()
     } catch (err) {
       console.error(err.message)
       setError("Failed to add task. Please try again later.")
@@ -69,7 +80,8 @@ function App() {
       })
       setEditingTask(null)
       setEditedTask("")
-      setTasks(tasks.map((task) => task.task_id === id ? { ...task, description: editedTask, completed: false } : task))
+      // setTasks(tasks.map((task) => task.task_id === id ? { ...task, description: editedTask, completed: false } : task))
+      getTasks()
     } catch (err) {
       console.error(err.message)
       setError("Failed to update task. Please try again later")
@@ -81,7 +93,8 @@ function App() {
     try {
       setError(null)
       await axios.delete(`http://localhost:5000/tasks/${id}`)
-      setTasks(tasks.filter((task) => task.task_id !== id))
+      // setTasks(tasks.filter((task) => task.task_id !== id))
+      getTasks()
     } catch (err) {
       console.error(err.message)
       setError("Failed to delete task. Please try again later")
@@ -188,6 +201,33 @@ function App() {
                   )}
                 </div>
               ))}
+              <div className="flex justify-between mt-6">
+                <button
+                  disabled={page === 1}
+                  onClick={() => setPage(page - 1)}
+                  className="mb-4 px-4 py-2 bg-blue-100 text-blue-700 rounded disabled:opacity-50"
+                >
+                  Previous
+                </button>
+
+                <span className="text-gray-800 py-2">
+                  Page {page} of {Math.ceil(total / pageSize)}
+                </span>
+
+                <button
+                  disabled={page * pageSize >= total}
+                  onClick={() => setPage(page + 1)}
+                  className="mb-4 px-4 py-2 bg-blue-100 text-blue-700 rounded disabled:opacity-50"
+                >
+                  Next
+                </button>
+                <button
+                  onClick={() => setSort(sort === "asc" ? "desc" : "asc")}
+                  className="mb-4 px-4 py-2 bg-blue-100 text-blue-700 rounded"
+                >
+                  Sort: {sort.toUpperCase()}
+                </button>
+              </div>
             </div>
           )}
         </div>
