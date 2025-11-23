@@ -36,44 +36,52 @@ function App() {
   // Submit Form 
   const onSubmitForm = async (e) => {
     e.preventDefault();
+    if (!description.trim()) return
     try {
-      await axios.post("http://localhost:5000/tasks", {
+      setError(null)
+      const res = await axios.post("http://localhost:5000/tasks", {
         description,
         completed: false
       })
+      setTasks([...tasks, res.data])
       setDescription("")
-      getTasks()
     } catch (err) {
       console.error(err.message)
+      setError("Failed to add task. Please try again later.")
     }
   }
 
   const saveEdit = async (id) => {
     try {
+      setError(null)
       await axios.put(`http://localhost:5000/tasks/${id}`, {
         description: editedTask
       })
       setEditingTask(null)
       setEditedTask("")
-      getTasks()
+      setTasks(tasks.map((task) => task.task_id === id ? { ...task, description: editedTask } : task))
     } catch (err) {
       console.error(err.message)
+      setError("Failed to update task. Please try again later")
     }
   }
 
   // Delete Task
   const deleteTask = async (id) => {
     try {
+      setError(null)
       await axios.delete(`http://localhost:5000/tasks/${id}`)
       setTasks(tasks.filter((task) => task.task_id !== id))
     } catch (err) {
       console.error(err.message)
+      setError("Failed to delete task. Please try again later")
     }
   }
 
   // Toggle Completed / !Completed
   const toggleCompleted = async (id) => {
     try {
+      setError(null)
       const task = tasks.find((task) => task.task_id === id)
       await axios.put(`http://localhost:5000/tasks/${id}`, {
         description: task.description,
@@ -82,6 +90,7 @@ function App() {
       setTasks(tasks.map((task) => (task.task_id === id ? { ...task, completed: !task.completed } : task)))
     } catch (err) {
       console.error(err.message)
+      setError("Failed to update task. Please try again later")
     }
   }
 
