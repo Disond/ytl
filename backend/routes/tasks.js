@@ -41,7 +41,7 @@ router.put('/:id', async (req, res) => {
         const { description, completed } = req.body
         const updatedTask = await pool.query(
             "UPDATE task SET description = $1, completed = $2 where task_id = $3 RETURNING *",
-            [description, completed, id]
+            [description, completed || false, id]
         )
         res.json({
             message: "Task updated.",
