@@ -6,10 +6,9 @@ import { protect } from '../middleware/auth.js'
 
 const router = express.Router()
 
-// 🔧 CHANGED (ispravljeno = umesto = u upoređivanju)
 const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // FIXED
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'Strict',
     maxAge: 30 * 24 * 60 * 60 * 1000
 }
@@ -20,13 +19,9 @@ const generateToken = (id) => {
     })
 }
 
-// =============================
-//       REGISTER
-// =============================
-
+// Register
 router.post('/register', async (req, res) => {
 
-    // 🔧 CHANGED (dodati firstname, lastname, role)
     const { firstname, lastname, username, email, password, role } = req.body  
 
     if (!firstname || !lastname || !username || !email || !password || !role) {
@@ -41,7 +36,6 @@ router.post('/register', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // 🔧 CHANGED — prilagođeno tvojoj tabeli!
     const newUser = await pool.query(
         `INSERT INTO users (firstname, lastname, username, email, password, role)
          VALUES ($1, $2, $3, $4, $5, $6)
@@ -56,11 +50,7 @@ router.post('/register', async (req, res) => {
     return res.status(201).json({ user: newUser.rows[0], token })
 })
 
-
-// =============================
-//          LOGIN
-// =============================
-
+// Login
 router.post('/login', async (req, res) => {
     const { email, password } = req.body
 
@@ -86,7 +76,6 @@ router.post('/login', async (req, res) => {
 
     res.cookie('token', token, cookieOptions)
 
-    // 🔧 CHANGED — vraćamo sve korisne podatke
     res.json({
         user: {
             id: userData.id,
@@ -100,21 +89,13 @@ router.post('/login', async (req, res) => {
     })
 })
 
-
-// =============================
-//          ME (auth check)
-// =============================
-
+// auth check
 router.get('/me', protect, async (req, res) => {
-    // req.user dolazi iz protect middleware
+    // req.user from protect middleware
     res.json(req.user)
 })
 
-
-// =============================
-//           LOGOUT
-// =============================
-
+// Logout
 router.post('/logout', (req, res) => {
     res.cookie('token', '', { ...cookieOptions, maxAge: 1 })
     res.json({ message: 'Logged out successfully' })
