@@ -1,10 +1,11 @@
 import { json, Router } from "express";
 import pool from "../db.js";
+import { protect } from "../middleware/auth.js";
 
 const router = Router()
 
-// Create new Task
-router.post('/', async (req, res) => {
+// Create Task
+router.post('/', protect, async (req, res) => {
     try {
         const { description, completed } = req.body
         if (!description) {
@@ -12,8 +13,8 @@ router.post('/', async (req, res) => {
         }
 
         const newTask = await pool.query(
-            "INSERT INTO task (description, completed) VALUES ($1, $2) RETURNING *",
-            [description, completed || false]
+            "INSERT INTO task (description, completed, user_id) VALUES ($1, $2, $3) RETURNING *",
+            [description, completed || false, req.user.id]
         );
         res.json(newTask.rows[0]);
     } catch (err) {
@@ -22,35 +23,41 @@ router.post('/', async (req, res) => {
     }
 });
 
-// UPDATED GET ALL TASKS — Pagination + Sorting
-router.get('/', async (req, res) => {
+// Admin >> User
+router.get('/', protect, async (req, res) => {
     try {
-        // Read query params
-        // let { page = 1, limit = params.pageSize, sort = "asc" } = req.query;
-
         let { page = 1, pageSize = 10, sort = "asc" } = req.query;
 
         page = parseInt(page);
         const limit = parseInt(pageSize);
         sort = sort.toLowerCase() === "desc" ? "DESC" : "ASC";
 
-        // page = parseInt(page);
-        // limit = parseInt(limit);
-        // sort = sort.toLowerCase() === "desc" ? "DESC" : "ASC";  // validate user input
-
         const offset = (page - 1) * limit;
 
-        // Get paginated tasks with sorting
-        const tasks = await pool.query(
-            `SELECT * 
-             FROM task 
-             ORDER BY task_id ${sort}
-             LIMIT $1 OFFSET $2`,
-            [limit, offset]
-        );
+        // Admin the mighty
+        const isAdmin = req.user.role === 'admin';
+        let tasks, totalCount;
 
-        // Get total for pagination UI
-        const totalCount = await pool.query("SELECT COUNT(*) FROM task");
+        if (isAdmin) {
+            tasks = await pool.query(
+                `SELECT * 
+                 FROM task 
+                 ORDER BY task_id ${sort}
+                 LIMIT $1 OFFSET $2`,
+                [limit, offset]
+            );
+            totalCount = await pool.query("SELECT COUNT(*) FROM task");
+        } else {
+            tasks = await pool.query(
+                `SELECT * 
+                 FROM task 
+                 WHERE user_id = $1
+                 ORDER BY task_id ${sort}
+                 LIMIT $2 OFFSET $3`,
+                [req.user.id, limit, offset]
+            );
+            totalCount = await pool.query("SELECT COUNT(*) FROM task WHERE user_id = $1", [req.user.id]);
+        }
 
         res.json({
             data: tasks.rows,
@@ -68,17 +75,29 @@ router.get('/', async (req, res) => {
 });
 
 // Update Task
-router.put('/:id', async (req, res) => {
+router.put('/:id', protect, async (req, res) => {
     try {
         const { id } = req.params
         const { description, completed } = req.body
         if (!description) {
             return res.status(400).json({ error: "Description is required" });
         }
-        const updatedTask = await pool.query(
-            "UPDATE task SET description = $1, completed = $2 WHERE task_id = $3 RETURNING *",
-            [description, completed || false, id]
-        );
+
+        const isAdmin = req.user.role === 'admin';
+        let updatedTask;
+
+        if (isAdmin) {
+            updatedTask = await pool.query(
+                "UPDATE task SET description = $1, completed = $2 WHERE task_id = $3 RETURNING *",
+                [description, completed || false, id]
+            );
+        } else {
+            updatedTask = await pool.query(
+                "UPDATE task SET description = $1, completed = $2 WHERE task_id = $3 AND user_id = $4 RETURNING *",
+                [description, completed || false, id, req.user.id]
+            );
+        }
+
         if (updatedTask.rows.length === 0) {
             return res.status(404).json({ error: "Task not found." });
         }
@@ -93,13 +112,24 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete Task
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', protect, async (req, res) => {
     try {
         const { id } = req.params
-        const deletedTask = await pool.query(
-            "DELETE FROM task WHERE task_id = $1 RETURNING *",
-            [id]
-        );
+        const isAdmin = req.user.role === 'admin';
+        let deletedTask;
+
+        if (isAdmin) {
+            deletedTask = await pool.query(
+                "DELETE FROM task WHERE task_id = $1 RETURNING *",
+                [id]
+            );
+        } else {
+            deletedTask = await pool.query(
+                "DELETE FROM task WHERE task_id = $1 AND user_id = $2 RETURNING *",
+                [id, req.user.id]
+            );
+        }
+
         if (deletedTask.rows.length === 0) {
             return res.status(404).json({ error: "Task not found." });
         }

@@ -24,14 +24,22 @@ router.post('/register', async (req, res) => {
 
     const { firstname, lastname, username, email, password, role } = req.body  
 
-    if (!firstname || !lastname || !username || !email || !password || !role) {
+    if (!firstname || !lastname || !username || !email || !password) {
         return res.status(400).json({ message: "Please provide all required fields." })
     }
 
-    const userExists = await pool.query('SELECT * FROM users WHERE email = $1', [email])
+    const userRole = role || "basic"
 
-    if (userExists.rows.length > 0) {
-        return res.status(400).json({ message: "User already exists." })
+    // Email check
+    const emailExists = await pool.query('SELECT * FROM users WHERE email = $1', [email])
+    if (emailExists.rows.length > 0) {
+        return res.status(400).json({ message: "Email already exists." })
+    }
+
+    // Username check
+    const usernameExists = await pool.query('SELECT * FROM users WHERE username = $1', [username])
+    if (usernameExists.rows.length > 0) {
+        return res.status(400).json({ message: "Username already exists." })
     }
 
     const hashedPassword = await bcrypt.hash(password, 10)
@@ -40,7 +48,7 @@ router.post('/register', async (req, res) => {
         `INSERT INTO users (firstname, lastname, username, email, password, role)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id, firstname, lastname, username, email, role, created_at`,
-        [firstname, lastname, username, email, hashedPassword, role]
+        [firstname, lastname, username, email, hashedPassword, userRole]
     )
 
     const token = generateToken(newUser.rows[0].id)
@@ -91,7 +99,6 @@ router.post('/login', async (req, res) => {
 
 // auth check
 router.get('/me', protect, async (req, res) => {
-    // req.user from protect middleware
     res.json(req.user)
 })
 
